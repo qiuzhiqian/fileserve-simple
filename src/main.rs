@@ -1,11 +1,8 @@
 mod handle;
+mod config;
 use clap::{App, Arg};
 use std::net::*;
 use threadpool::ThreadPool;
-
-const DEFAULT_WORKERS: &str = "10";
-const DEFAULT_PORT: &str = "8080";
-const DEFAULT_BIND: &str = "0.0.0.0";
 
 fn main() {
     let matches = App::new("fileserve-simple")
@@ -17,24 +14,24 @@ fn main() {
                 .value_name("AMOUNT")
                 .help(&format!(
                     "Number of requests that can be handled concurrently [default: {}]",
-                    DEFAULT_WORKERS
+                    config::DEFAULT_WORKERS
                 ))
                 .takes_value(true),
         )
         .arg(
             Arg::with_name("port")
                 .value_name("PORT")
-                .help(&format!("Port to run on [default: {}]", DEFAULT_PORT))
+                .help(&format!("Port to run on [default: {}]", config::DEFAULT_PORT))
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("bind")
-                .short("b")
-                .long("bind")
+            Arg::with_name("address")
+                .short("a")
+                .long("address")
                 .value_name("ADDRESS")
                 .help(&format!(
                     "Alternative bind address [default: {}]",
-                    DEFAULT_BIND
+                    config::DEFAULT_ADDRESS
                 ))
                 .takes_value(true),
         )
@@ -46,34 +43,37 @@ fn main() {
                 .help("Alternative directory to serve [default: curent directory]")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("size")
+                .short("s")
+                .long("size")
+                .value_name("SIZE")
+                .help(&format!("set file list font size [default: {}]",config::DEFAULT_SIZE))
+                .takes_value(true),
+        )
         .get_matches();
 
-    let n_workers: usize = matches
-        .value_of("workers")
-        .unwrap_or(DEFAULT_WORKERS)
-        .parse()
-        .expect("Args Error: Invalid worker count");
-    let port: u16 = matches
-        .value_of(DEFAULT_PORT)
-        .unwrap_or("8080")
-        .parse()
-        .expect("Args Error: Invalid port number");
-    let bind = matches.value_of("bind").unwrap_or(DEFAULT_BIND);
-    let directory = matches.value_of("directory").unwrap_or(".");
+    let config = config::Config{
+        address: String::from(matches.value_of("address").unwrap_or(config::DEFAULT_ADDRESS)),
+        port: matches.value_of("port").unwrap_or(config::DEFAULT_PORT).parse().expect("Args Error: Invalid port number"),
+        works: matches.value_of("workers").unwrap_or(config::DEFAULT_WORKERS).parse().expect("Args Error: Invalid worker count"),
+        root: String::from(matches.value_of("directory").unwrap_or(".")),
+        size: matches.value_of("size").unwrap_or(config::DEFAULT_SIZE).parse().expect("Args Error: Invalid size number"),
+    };
 
-    let listener = TcpListener::bind((bind, port)).expect("Error: Failed to bind to port");
-    let pool = ThreadPool::new(n_workers);
+    let listener = TcpListener::bind((config.address.as_str(), config.port)).expect("Error: Failed to bind to port");
+    let pool = ThreadPool::new(config.works);
 
     println!(
         "Serving HTTP on {} port {} (http://{}:{}/) ...",
-        bind, port, bind, port
+        config.address, config.port, config.address, config.port
     );
 
     for stream in listener.incoming() {
         if let Ok(mut stream) = stream {
-            let dir = String::from(directory);
+            let c = config.clone_data();
             pool.execute(move || {
-                let _res = handle::handle_connection(&mut stream, dir);
+                let _res = handle::handle_connection(&mut stream, c);
             });
         }
     }

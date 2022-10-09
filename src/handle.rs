@@ -18,7 +18,7 @@ pub enum HttpField {
     Path,
 }
 
-pub fn handle_connection(mut stream: &mut TcpStream, directory: String) -> Result<(), HttpError> {
+pub fn handle_connection(mut stream: &mut TcpStream, c: crate::config::Config/*directory: String*/) -> Result<(), HttpError> {
     let mut buf = [0; 1024];
     stream.read(&mut buf).map_err(HttpError::FailedRead)?;
 
@@ -26,7 +26,7 @@ pub fn handle_connection(mut stream: &mut TcpStream, directory: String) -> Resul
     let mut req = Request::new(&mut headers);
     let _status = req.parse(&buf).map_err(HttpError::FailedParse)?;
 
-    handle_request(&req, &mut stream, &directory)?;
+    handle_request(&req, &mut stream, &c)?;
 
     Ok(())
 }
@@ -34,7 +34,8 @@ pub fn handle_connection(mut stream: &mut TcpStream, directory: String) -> Resul
 fn handle_request(
     req: &Request,
     mut stream: &mut TcpStream,
-    directory: &str,
+    c: &crate::config::Config
+    /*directory: &str,*/
 ) -> Result<(), HttpError> {
     let (version, method, path) = all_fields(&req)?;
     println!(
@@ -45,7 +46,7 @@ fn handle_request(
         stream.peer_addr()
     );
 
-    match fetch_path(path, directory) {
+    match fetch_path(path, &c.root,c.size) {
         Ok(FetchResult::Dir(html)) => {
             stream
                 .write(
@@ -125,7 +126,7 @@ enum FetchResult {
     File(File, Mime),
 }
 
-fn fetch_path(path_str: &str, directory: &str) -> Result<FetchResult, FetchError> {
+fn fetch_path(path_str: &str, directory: &str,size: u32) -> Result<FetchResult, FetchError> {
     let mut path_string = String::from(directory);
     path_string.push_str(path_str);
     let path = Path::new(&path_string)
@@ -154,12 +155,12 @@ fn fetch_path(path_str: &str, directory: &str) -> Result<FetchResult, FetchError
             }
         };
         entries.sort_by(cmp);
-        add_filename_to_page("..", &mut page);
+        add_filename_to_page("..", &mut page, size);
         for entry in entries {
             let filename_osstr = entry.file_name();
             let filename =
                 filename_osstr.to_string_lossy() + if entry.path().is_dir() { "/" } else { "" };
-            add_filename_to_page(&filename, &mut page);
+            add_filename_to_page(&filename, &mut page, size);
         }
         page.push_str(end);
         Ok(FetchResult::Dir(page))
@@ -177,6 +178,6 @@ fn fetch_path(path_str: &str, directory: &str) -> Result<FetchResult, FetchError
     }
 }
 
-fn add_filename_to_page(filename: &str, page: &mut String) {
-    page.push_str(format!("<li><a href={}>{}</a></li>", filename, filename).as_str());
+fn add_filename_to_page(filename: &str, page: &mut String,size: u32) {
+    page.push_str(format!("<li style='font-size:{}px'><a href={}>{}</a></li>", size, filename, filename).as_str());
 }
