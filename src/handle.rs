@@ -4,6 +4,7 @@ use std::fs::{DirEntry, File};
 use std::io::prelude::*;
 use std::net::*;
 use std::path::Path;
+use std::path::PathBuf;
 
 pub enum HttpError {
     FailedRead(std::io::Error),
@@ -46,7 +47,7 @@ fn handle_request(
         stream.peer_addr()
     );
 
-    match fetch_path(path, &c.root,c.size) {
+    match fetch_path(path, &c.path,c.size) {
         Ok(FetchResult::Dir(html)) => {
             stream
                 .write(
@@ -126,12 +127,9 @@ enum FetchResult {
     File(File, Mime),
 }
 
-fn fetch_path(path_str: &str, directory: &str,size: u32) -> Result<FetchResult, FetchError> {
-    let mut path_string = String::from(directory);
-    path_string.push_str(path_str);
-    let path = Path::new(&path_string)
-        .canonicalize()
-        .map_err(FetchError::IOError)?;
+fn fetch_path(path_str: &str, directory: &PathBuf,size: u32) -> Result<FetchResult, FetchError> {
+    let path = directory.join(Path::new(path_str.trim_start_matches("/"))).canonicalize().map_err(FetchError::IOError)?;
+    println!("path: {} {} {}",directory.to_str().unwrap(), path_str, path.to_str().unwrap());
     if path.is_dir() {
         let title = format!("Directory listing for {}", path_str);
         let start = format!(

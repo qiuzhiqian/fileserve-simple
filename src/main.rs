@@ -1,11 +1,14 @@
 mod handle;
 mod config;
-use clap::{App, Arg};
+mod args;
 use std::net::*;
 use threadpool::ThreadPool;
+use clap::Parser;
 
-fn main() {
-    let matches = App::new("fileserve-simple")
+fn main() -> std::io::Result<()> {
+    let args = args::CliArgs::parse();
+    let config = config::Config::try_from_args(args)?;
+    /*let matches = App::new("fileserve")
         .version("0.1.0")
         .arg(
             Arg::with_name("workers")
@@ -59,14 +62,14 @@ fn main() {
         works: matches.value_of("workers").unwrap_or(config::DEFAULT_WORKERS).parse().expect("Args Error: Invalid worker count"),
         root: String::from(matches.value_of("directory").unwrap_or(".")),
         size: matches.value_of("size").unwrap_or(config::DEFAULT_SIZE).parse().expect("Args Error: Invalid size number"),
-    };
+    };*/
 
-    let listener = TcpListener::bind((config.address.as_str(), config.port)).expect("Error: Failed to bind to port");
+    let listener = TcpListener::bind((config.interface, config.port)).expect("Error: Failed to bind to port");
     let pool = ThreadPool::new(config.works);
 
     println!(
         "Serving HTTP on {} port {} (http://{}:{}/) ...",
-        config.address, config.port, config.address, config.port
+        config.interface, config.port, config.interface, config.port
     );
 
     for stream in listener.incoming() {
@@ -77,4 +80,6 @@ fn main() {
             });
         }
     }
+
+    Ok(())
 }
