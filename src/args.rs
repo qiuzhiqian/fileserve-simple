@@ -19,7 +19,7 @@ pub struct CliArgs {
     pub port: u16,
 
     /// Interface to listen on
-    #[clap(short = 'i',long = "interfaces",value_parser=value_parser!(IpAddr), default_value = "0.0.0.0")]
+    #[clap(short = 'i',long = "interface",value_parser=value_parser!(IpAddr), default_value = "0.0.0.0")]
     pub interface: IpAddr,
 
     /// works for threadpool
